@@ -64,6 +64,7 @@ class GestureResult:
     gesture: Optional[int]
     is_ok: bool
     handedness: str
+    side: str
 
 
 def skill_name(skill_id: Optional[int]) -> str:

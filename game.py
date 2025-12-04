@@ -70,8 +70,8 @@ def run_game():
 
         if not started:
             draw_center_text(screen, fonts, selection_prompt, 10, color=(255, 255, 0))
-            left_ok = any(g.is_ok and g.handedness == "Left" for g in gestures)
-            right_ok = any(g.is_ok and g.handedness == "Right" for g in gestures)
+            left_ok = any(g.is_ok and g.side == "Left" for g in gestures)
+            right_ok = any(g.is_ok and g.side == "Right" for g in gestures)
             if left_ok and right_ok:
                 started = True
                 round_state.selection_start = time.time()
@@ -91,9 +91,9 @@ def run_game():
             draw_center_text(screen, fonts, f"第{round_state.round_index}回合", 20)
             draw_center_text(screen, fonts, f"倒计时: {countdown}s", 60, color=(255, 220, 120))
             for g in gestures:
-                if g.handedness == "Left":
+                if g.side == "Left":
                     round_state.left_choice = g.gesture or round_state.left_choice
-                elif g.handedness == "Right":
+                elif g.side == "Right":
                     round_state.right_choice = g.gesture or round_state.right_choice
             draw_skills_area(screen, fonts, True, round_state.left_choice)
             draw_skills_area(screen, fonts, False, round_state.right_choice)
