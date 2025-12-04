@@ -59,17 +59,22 @@ def detect_gestures(frame) -> Tuple[List[GestureResult], np.ndarray, Dict[str, n
     crops: Dict[str, np.ndarray] = {}
     annotated = frame.copy()
     if result.multi_hand_landmarks and result.multi_handedness:
+        width = frame.shape[1]
         for hand_landmarks, handedness in zip(result.multi_hand_landmarks, result.multi_handedness):
             label = handedness.classification[0].label
+            xs = [pt.x for pt in hand_landmarks.landmark]
+            center_x = np.mean(xs)
+            side = "Right" if center_x * width < width / 2 else "Left"
             gesture_num = count_fingers(hand_landmarks, label)
             gestures.append(
                 GestureResult(
                     gesture=gesture_num if 1 <= gesture_num <= 5 else None,
                     is_ok=detect_ok(hand_landmarks),
                     handedness=label,
+                    side=side,
                 )
             )
             mp_drawing.draw_landmarks(annotated, hand_landmarks, mp_hands.HAND_CONNECTIONS)
             x_min, y_min, x_max, y_max = _hand_bbox(hand_landmarks, frame.shape)
-            crops[label] = frame[y_min:y_max, x_min:x_max].copy()
+            crops[side] = frame[y_min:y_max, x_min:x_max].copy()
     return gestures, annotated, crops
