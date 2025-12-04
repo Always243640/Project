@@ -64,7 +64,7 @@ def detect_gestures(frame) -> Tuple[List[GestureResult], np.ndarray, Dict[str, n
             label = handedness.classification[0].label
             xs = [pt.x for pt in hand_landmarks.landmark]
             center_x = np.mean(xs)
-            side = "Left" if center_x * width < width / 2 else "Right"
+            side = "Right" if center_x * width < width / 2 else "Left"
             gesture_num = count_fingers(hand_landmarks, label)
             gestures.append(
                 GestureResult(
