@@ -1,4 +1,5 @@
 import math
+import os
 import random
 from typing import List, Tuple
 
@@ -6,6 +7,8 @@ import pygame
 
 # 初始化Pygame混合模式
 pygame.init()
+
+ASSET_DIR = os.path.dirname(__file__)
 
 
 class Particle:
@@ -48,9 +51,9 @@ class NormalAttackEffect:
     def _load_claw(cls) -> pygame.Surface:
         if cls._claw_sprite is None:
             sprite = pygame.image.load("claw.png").convert_alpha()
-            # 抓痕缩小为原先的一半，避免遮挡角色
+            # 抓痕缩小为原先的35%，避免遮挡角色
             cls._claw_sprite = pygame.transform.smoothscale(
-                sprite, (int(sprite.get_width() * 0.5), int(sprite.get_height() * 0.5))
+                sprite, (int(sprite.get_width() * 0.35), int(sprite.get_height() * 0.35))
             )
         return cls._claw_sprite
 
@@ -60,13 +63,12 @@ class NormalAttackEffect:
         self.current_pos = list(self.start_pos)
         self.color = (240, 200, 120) if is_player1 else (120, 210, 240)
         self.timer = 0
-        self.travel_frames = 12  # 略快一些的起手
         self.slash_frames = 30   # 击中后的显示时间与淡出
-        self.trail: List[dict] = []
         self.claw_marks: List[dict] = []
-        self.hit = False
+        self.hit = True
         self.damage_timer = 0
         self.claw_sprite = self._load_claw()
+        self._create_claw()
 
     def _create_claw(self):
         base_angle = math.atan2(self.target_pos[1] - self.start_pos[1], self.target_pos[0] - self.start_pos[0])
@@ -109,64 +111,31 @@ class NormalAttackEffect:
 
     def update(self):
         self.timer += 1
-        if not self.hit:
-            progress = min(1, self.timer / self.travel_frames)
-            self.current_pos[0] = self.start_pos[0] + (self.target_pos[0] - self.start_pos[0]) * progress
-            self.current_pos[1] = self.start_pos[1] + (self.target_pos[1] - self.start_pos[1]) * progress
-            self.trail.append({
-                "x": self.current_pos[0],
-                "y": self.current_pos[1],
-                "alpha": 200,
-                "life": 12
-            })
-            if progress >= 1:
-                self.hit = True
-                self._create_claw()
-        else:
-            for mark in self.claw_marks[:]:
-                mark["life"] -= 1
-                mark["alpha"] = int(255 * (mark["life"] / self.slash_frames))
-                if mark["life"] <= 0:
-                    self.claw_marks.remove(mark)
-            if self.damage_timer > 0:
-                self.damage_timer -= 1
-
-        for trail in self.trail[:]:
-            trail["life"] -= 1
-            trail["alpha"] = max(0, trail["alpha"] - 16)
-            if trail["life"] <= 0:
-                self.trail.remove(trail)
+        for mark in self.claw_marks[:]:
+            mark["life"] -= 1
+            mark["alpha"] = int(255 * (mark["life"] / self.slash_frames))
+            if mark["life"] <= 0:
+                self.claw_marks.remove(mark)
+        if self.damage_timer > 0:
+            self.damage_timer -= 1
 
     def draw(self, surface: pygame.Surface):
-        # 轨迹模糊
-        for trail in self.trail:
-            radius = 10
-            blur_surface = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-            pygame.draw.circle(blur_surface, (*self.color, trail["alpha"]), (radius, radius), radius)
-            surface.blit(blur_surface, (int(trail["x"] - radius), int(trail["y"] - radius)))
+        for mark in self.claw_marks:
+            mark["blur"].set_alpha(int(mark["alpha"] * 0.6))
+            mark["sharp"].set_alpha(mark["alpha"])
+            surface.blit(mark["blur"], mark["blur_rect"])
+            surface.blit(mark["sharp"], mark["rect"])
 
-        if not self.hit:
-            core = pygame.Surface((18, 18), pygame.SRCALPHA)
-            pygame.draw.circle(core, (255, 255, 255, 230), (9, 9), 9)
-            pygame.draw.circle(core, (*self.color, 200), (9, 9), 6)
-            surface.blit(core, (int(self.current_pos[0] - 9), int(self.current_pos[1] - 9)))
-        else:
-            for mark in self.claw_marks:
-                mark["blur"].set_alpha(int(mark["alpha"] * 0.6))
-                mark["sharp"].set_alpha(mark["alpha"])
-                surface.blit(mark["blur"], mark["blur_rect"])
-                surface.blit(mark["sharp"], mark["rect"])
-
-            if self.damage_timer > 0:
-                font = pygame.font.Font(None, 32)
-                alpha = int(255 * (self.damage_timer / self.slash_frames))
-                text = font.render("-10", True, (255, 80, 80))
-                text.set_alpha(alpha)
-                y_offset = (self.slash_frames - self.damage_timer) * 0.6
-                surface.blit(text, (self.target_pos[0] - 16, self.target_pos[1] - 40 - y_offset))
+        if self.damage_timer > 0:
+            font = pygame.font.Font(None, 32)
+            alpha = int(255 * (self.damage_timer / self.slash_frames))
+            text = font.render("-10", True, (255, 80, 80))
+            text.set_alpha(alpha)
+            y_offset = (self.slash_frames - self.damage_timer) * 0.6
+            surface.blit(text, (self.target_pos[0] - 16, self.target_pos[1] - 40 - y_offset))
 
     def is_done(self) -> bool:
-        return self.hit and not self.trail and not self.claw_marks and self.damage_timer <= 0
+        return self.hit and not self.claw_marks and self.damage_timer <= 0
 
 
 class HealEffect:
@@ -228,33 +197,57 @@ class HealEffect:
 class FlameAttackEffect:
     """火焰攻击：火焰弹飞向目标，命中后逐渐消散"""
 
+    _left_sprite: pygame.Surface | None = None
+    _right_sprite: pygame.Surface | None = None
+
+    @classmethod
+    def _load_sprite(cls, is_left: bool) -> pygame.Surface:
+        if is_left:
+            if cls._left_sprite is None:
+                sprite = pygame.image.load(os.path.join(ASSET_DIR, "fire.png")).convert_alpha()
+                cls._left_sprite = pygame.transform.smoothscale(
+                    sprite, (int(sprite.get_width() * 0.6), int(sprite.get_height() * 0.6))
+                )
+            return cls._left_sprite
+        else:
+            if cls._right_sprite is None:
+                sprite = pygame.image.load(os.path.join(ASSET_DIR, "fire.png")).convert_alpha()
+                cls._right_sprite = pygame.transform.smoothscale(
+                    sprite, (int(sprite.get_width() * 0.6), int(sprite.get_height() * 0.6))
+                )
+            return cls._right_sprite
+
     def __init__(self, start_x: float, start_y: float, target_x: float, target_y: float):
         self.start_pos = (start_x, start_y)
         self.target_pos = (target_x, target_y)
+        self.is_left = start_x < target_x
+        self.sprite = self._load_sprite(self.is_left)
+        blur_scale = 1.08
+        blurred = pygame.transform.smoothscale(
+            self.sprite,
+            (int(self.sprite.get_width() * blur_scale), int(self.sprite.get_height() * blur_scale)),
+        )
+        blurred.set_alpha(180)
+        self.blurred_sprite = blurred
         self.progress = 0
         self.speed = 0.06
         self.hit = False
         self.timer = 0
-        self.trail: List[Particle] = []
+        self.elapsed = 0
         self.smoke: List[Particle] = []
         self.burst_particles: List[Particle] = []
         self.max_travel_frames = int(1 / self.speed)
         self.dissipate_frames = 45
+        self.fade_portion = 0.18
+        self.wave_phase = random.uniform(0, math.pi * 2)
 
     def update(self):
         if not self.hit:
+            self.elapsed += 1
             self.progress += self.speed
             self.progress = min(1, self.progress)
             cx = self.start_pos[0] + (self.target_pos[0] - self.start_pos[0]) * self.progress
             cy = self.start_pos[1] + (self.target_pos[1] - self.start_pos[1]) * self.progress
-            if random.random() < 0.9:
-                p = Particle(cx, cy, random.choice([(255, 70, 70), (255, 120, 90), (240, 40, 40)]))
-                p.size = random.uniform(4, 8)
-                p.gravity = 0.012
-                self.trail.append(p)
-            for p in self.trail[:]:
-                if not p.update():
-                    self.trail.remove(p)
             if self.progress >= 1:
                 self.hit = True
                 self.timer = self.dissipate_frames
@@ -293,18 +286,25 @@ class FlameAttackEffect:
         if not self.hit:
             cx = self.start_pos[0] + (self.target_pos[0] - self.start_pos[0]) * self.progress
             cy = self.start_pos[1] + (self.target_pos[1] - self.start_pos[1]) * self.progress
-            for p in self.trail:
-                p.draw(surface)
 
-            # 火球主体：前端尖形，带有强烈亮度
-            flame = pygame.Surface((70, 44), pygame.SRCALPHA)
-            pygame.draw.ellipse(flame, (255, 150, 150, 230), (6, 8, 56, 28))
-            pygame.draw.ellipse(flame, (240, 50, 50, 255), (14, 12, 40, 18))
-            pygame.draw.circle(flame, (255, 240, 240, 240), (52, 22), 10)
             angle = -math.degrees(math.atan2(self.target_pos[1] - self.start_pos[1], self.target_pos[0] - self.start_pos[0]))
-            rotated = pygame.transform.rotate(flame, angle)
-            rect = rotated.get_rect(center=(int(cx), int(cy)))
-            surface.blit(rotated, rect)
+            fade_in = min(1.0, self.progress / self.fade_portion)
+            fade_out = min(1.0, (1 - self.progress) / self.fade_portion)
+            alpha_factor = min(fade_in, fade_out)
+
+            wobble = math.sin((self.elapsed + self.wave_phase) * 0.4) * 6 + random.uniform(-1.5, 1.5)
+            cy += wobble
+
+            sprite = pygame.transform.rotozoom(self.sprite, angle, 1.0)
+            blur = pygame.transform.rotozoom(self.blurred_sprite, angle, 1.0)
+            sprite.set_alpha(int(255 * alpha_factor))
+            blur.set_alpha(int(170 * alpha_factor))
+
+            rect_blur = blur.get_rect(center=(int(cx), int(cy)))
+            rect = sprite.get_rect(center=(int(cx), int(cy)))
+
+            surface.blit(blur, rect_blur)
+            surface.blit(sprite, rect)
         else:
             for p in self.smoke:
                 p.draw(surface)
@@ -398,7 +398,7 @@ class UltimateEffect:
     @classmethod
     def _load_boom(cls) -> pygame.Surface:
         if cls._boom_sprite is None:
-            sprite = pygame.image.load("boom.gif").convert_alpha()
+            sprite = pygame.image.load(os.path.join(ASSET_DIR, "boom.gif")).convert_alpha()
             sprite.set_colorkey((0, 0, 0))
             cls._boom_sprite = sprite
         return cls._boom_sprite
@@ -409,7 +409,7 @@ class UltimateEffect:
         self.is_player1 = is_player1
         self.charge_frames = 18
         self.flight_frames = 14
-        self.explosion_frames = 55
+        self.explosion_frames = 78
         self.stage = 0  # 0:charge,1:flight,2:explode
         self.timer = 0
         self.projectile_pos = list(self.start_pos)
@@ -478,23 +478,27 @@ class UltimateEffect:
             pygame.draw.circle(glow, (*self.main_color, 200), (15, 15), 7)
             surface.blit(glow, (int(self.projectile_pos[0] - 15), int(self.projectile_pos[1] - 15)))
         elif self.stage == 2:
-            progress = min(1, self.timer / self.explosion_frames)
-            radius = 30 + progress * 50
-            alpha = int(255 * (1 - progress))
+            progress = min(1.0, self.timer / self.explosion_frames)
+            eased = progress ** 0.7
+            radius = 36 + eased * 64
+            alpha = int(255 * (1 - eased))
             ring = pygame.Surface((int(radius * 2), int(radius * 2)), pygame.SRCALPHA)
-            pygame.draw.circle(ring, (*self.main_color, alpha), (int(radius), int(radius)), int(radius), 6)
+            highlight_color = tuple(min(255, c + 60) for c in self.main_color)
+            pygame.draw.circle(ring, (*highlight_color, min(255, alpha + 40)), (int(radius), int(radius)), int(radius), 8)
+            pygame.draw.circle(ring, (*self.main_color, alpha), (int(radius), int(radius)), int(radius * 0.62))
             surface.blit(ring, (int(self.target_pos[0] - radius), int(self.target_pos[1] - radius)))
             # 爆炸贴图加戏：扩大并逐渐淡出
-            boom_size = 90 + progress * 90
+            target_visual_size = max(120, self.boom_sprite.get_width(), self.boom_sprite.get_height())
+            boom_size = target_visual_size
             boom = pygame.transform.smoothscale(self.boom_sprite, (int(boom_size), int(boom_size)))
-            boom.set_alpha(max(0, int(240 * (1 - progress))))
+            boom.set_alpha(max(0, int(255 * (1 - eased))))
             boom_rect = boom.get_rect(center=(int(self.target_pos[0]), int(self.target_pos[1] - 10)))
             surface.blit(boom, boom_rect)
             for p in self.explosion_particles:
                 p.draw(surface)
             if progress < 0.6:
                 font = pygame.font.Font(None, 36)
-                text = font.render("-90", True, self.main_color)
+                text = font.render("-90", True, highlight_color)
                 surface.blit(text, (self.target_pos[0] - 20, self.target_pos[1] - 60))
 
     def is_done(self) -> bool:
