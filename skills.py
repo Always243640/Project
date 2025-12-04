@@ -204,17 +204,18 @@ class FlameAttackEffect:
     def _load_sprite(cls, is_left: bool) -> pygame.Surface:
         if is_left:
             if cls._left_sprite is None:
-                sprite = pygame.image.load(os.path.join(ASSET_DIR, "left_fire.png")).convert_alpha()
+                sprite = pygame.image.load(os.path.join(ASSET_DIR, "fire.png")).convert_alpha()
                 cls._left_sprite = pygame.transform.smoothscale(
                     sprite, (int(sprite.get_width() * 0.6), int(sprite.get_height() * 0.6))
                 )
             return cls._left_sprite
-        if cls._right_sprite is None:
-            sprite = pygame.image.load(os.path.join(ASSET_DIR, "right_fire.png")).convert_alpha()
-            cls._right_sprite = pygame.transform.smoothscale(
-                sprite, (int(sprite.get_width() * 0.6), int(sprite.get_height() * 0.6))
-            )
-        return cls._right_sprite
+        else:
+            if cls._right_sprite is None:
+                sprite = pygame.image.load(os.path.join(ASSET_DIR, "fire.png")).convert_alpha()
+                cls._right_sprite = pygame.transform.smoothscale(
+                    sprite, (int(sprite.get_width() * 0.6), int(sprite.get_height() * 0.6))
+                )
+            return cls._right_sprite
 
     def __init__(self, start_x: float, start_y: float, target_x: float, target_y: float):
         self.start_pos = (start_x, start_y)
@@ -487,8 +488,8 @@ class UltimateEffect:
             pygame.draw.circle(ring, (*self.main_color, alpha), (int(radius), int(radius)), int(radius * 0.62))
             surface.blit(ring, (int(self.target_pos[0] - radius), int(self.target_pos[1] - radius)))
             # 爆炸贴图加戏：扩大并逐渐淡出
-            target_visual_size = max(320, self.boom_sprite.get_width(), self.boom_sprite.get_height())
-            boom_size = target_visual_size * 3
+            target_visual_size = max(120, self.boom_sprite.get_width(), self.boom_sprite.get_height())
+            boom_size = target_visual_size
             boom = pygame.transform.smoothscale(self.boom_sprite, (int(boom_size), int(boom_size)))
             boom.set_alpha(max(0, int(255 * (1 - eased))))
             boom_rect = boom.get_rect(center=(int(self.target_pos[0]), int(self.target_pos[1] - 10)))
