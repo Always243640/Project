@@ -48,7 +48,10 @@ class NormalAttackEffect:
     def _load_claw(cls) -> pygame.Surface:
         if cls._claw_sprite is None:
             sprite = pygame.image.load("claw.png").convert_alpha()
-            cls._claw_sprite = sprite
+            # 抓痕缩小为原先的一半，避免遮挡角色
+            cls._claw_sprite = pygame.transform.smoothscale(
+                sprite, (int(sprite.get_width() * 0.5), int(sprite.get_height() * 0.5))
+            )
         return cls._claw_sprite
 
     def __init__(self, start_x: float, start_y: float, target_x: float, target_y: float, is_player1: bool = True):
@@ -68,7 +71,7 @@ class NormalAttackEffect:
     def _create_claw(self):
         base_angle = math.atan2(self.target_pos[1] - self.start_pos[1], self.target_pos[0] - self.start_pos[0])
         for i in range(3):
-            scale = 0.85 + i * 0.1
+            scale = 0.95 + i * 0.08
             sprite = pygame.transform.rotozoom(self.claw_sprite, 0, scale)
             # 以平行于攻击方向的角度旋转
             angle = base_angle + random.uniform(-0.18, 0.18)
@@ -179,14 +182,14 @@ class HealEffect:
 
     def update(self):
         self.timer += 1
-        self.glow_radius = 25 + math.sin(self.timer * 0.15) * 6
+        self.glow_radius = 32 + math.sin(self.timer * 0.15) * 7
         if self.timer < self.duration:
             # 冒泡加号
             if self.timer % 2 == 0:
                 self.pluses.append({
                     "x": self.x + random.uniform(-18, 18),
                     "y": self.y - random.uniform(0, 12),
-                    "size": random.uniform(12, 24),
+                    "size": random.uniform(16, 28),
                     "speed": random.uniform(-1.6, -0.8),
                     "alpha": 255,
                 })
@@ -213,7 +216,7 @@ class HealEffect:
             surface.blit(plus_surface, (plus["x"] - size / 2, plus["y"] - size / 2))
 
         if self.timer < self.duration:
-            font = pygame.font.Font(None, 32)
+            font = pygame.font.Font(None, 38)
             text = font.render("+10", True, (100, 240, 140))
             text.set_alpha(max(0, 255 - int(self.timer * 3)))
             surface.blit(text, (self.x - 16, self.y - 50 - self.timer * 0.4))
@@ -244,10 +247,10 @@ class FlameAttackEffect:
             self.progress = min(1, self.progress)
             cx = self.start_pos[0] + (self.target_pos[0] - self.start_pos[0]) * self.progress
             cy = self.start_pos[1] + (self.target_pos[1] - self.start_pos[1]) * self.progress
-            if random.random() < 0.85:
-                p = Particle(cx, cy, random.choice([(255, 120, 40), (255, 190, 70), (255, 80, 20)]))
-                p.size = random.uniform(3, 6.5)
-                p.gravity = 0.01
+            if random.random() < 0.9:
+                p = Particle(cx, cy, random.choice([(255, 70, 70), (255, 120, 90), (240, 40, 40)]))
+                p.size = random.uniform(4, 8)
+                p.gravity = 0.012
                 self.trail.append(p)
             for p in self.trail[:]:
                 if not p.update():
@@ -255,22 +258,22 @@ class FlameAttackEffect:
             if self.progress >= 1:
                 self.hit = True
                 self.timer = self.dissipate_frames
-                for _ in range(30):
+                for _ in range(32):
                     smoke = Particle(
-                        self.target_pos[0], self.target_pos[1], random.choice([(120, 120, 120), (160, 140, 120)])
+                        self.target_pos[0], self.target_pos[1], random.choice([(120, 90, 90), (160, 110, 110)])
                     )
-                    smoke.size = random.uniform(4, 9)
+                    smoke.size = random.uniform(5, 10)
                     smoke.speed_x *= 1.6
                     smoke.speed_y *= 1.6
                     smoke.gravity = -0.02
                     self.smoke.append(smoke)
-                for _ in range(18):
+                for _ in range(22):
                     ember = Particle(
                         self.target_pos[0],
                         self.target_pos[1],
-                        random.choice([(255, 150, 80), (255, 200, 120), (255, 100, 40)]),
+                        random.choice([(255, 120, 120), (255, 180, 160), (255, 90, 90)]),
                     )
-                    ember.size = random.uniform(2.5, 4.5)
+                    ember.size = random.uniform(3, 5)
                     ember.speed_x *= 2.5
                     ember.speed_y *= 2.5
                     ember.gravity = -0.03
@@ -294,10 +297,10 @@ class FlameAttackEffect:
                 p.draw(surface)
 
             # 火球主体：前端尖形，带有强烈亮度
-            flame = pygame.Surface((52, 32), pygame.SRCALPHA)
-            pygame.draw.ellipse(flame, (255, 200, 120, 220), (4, 6, 44, 20))
-            pygame.draw.ellipse(flame, (255, 120, 40, 255), (10, 10, 32, 12))
-            pygame.draw.circle(flame, (255, 255, 255, 230), (40, 16), 8)
+            flame = pygame.Surface((70, 44), pygame.SRCALPHA)
+            pygame.draw.ellipse(flame, (255, 150, 150, 230), (6, 8, 56, 28))
+            pygame.draw.ellipse(flame, (240, 50, 50, 255), (14, 12, 40, 18))
+            pygame.draw.circle(flame, (255, 240, 240, 240), (52, 22), 10)
             angle = -math.degrees(math.atan2(self.target_pos[1] - self.start_pos[1], self.target_pos[0] - self.start_pos[0]))
             rotated = pygame.transform.rotate(flame, angle)
             rect = rotated.get_rect(center=(int(cx), int(cy)))
@@ -308,11 +311,11 @@ class FlameAttackEffect:
             for p in self.burst_particles:
                 p.draw(surface)
             if self.timer > 0:
-                alpha = int(220 * (self.timer / self.dissipate_frames))
-                radius = 44 - (self.timer / self.dissipate_frames) * 24
+                alpha = int(230 * (self.timer / self.dissipate_frames))
+                radius = 48 - (self.timer / self.dissipate_frames) * 26
                 temp = pygame.Surface((int(radius * 2), int(radius * 2)), pygame.SRCALPHA)
-                pygame.draw.circle(temp, (255, 140, 60, alpha), (int(radius), int(radius)), int(radius), 4)
-                pygame.draw.circle(temp, (255, 230, 160, max(20, alpha - 40)), (int(radius), int(radius)), int(radius * 0.6))
+                pygame.draw.circle(temp, (255, 100, 100, alpha), (int(radius), int(radius)), int(radius), 4)
+                pygame.draw.circle(temp, (255, 170, 170, max(30, alpha - 30)), (int(radius), int(radius)), int(radius * 0.6))
                 surface.blit(temp, (int(self.target_pos[0] - radius), int(self.target_pos[1] - radius)))
 
     def is_done(self) -> bool:
@@ -328,9 +331,19 @@ class ShieldEffect:
     @classmethod
     def _load_sprite(cls, is_left: bool) -> pygame.Surface:
         if is_left and cls._left_sprite is None:
-            cls._left_sprite = pygame.image.load("left_shield.png").convert_alpha()
+            sprite = pygame.image.load("left_shield.png").convert_alpha()
+            target_height = int(320 * 2 / 3)  # 盾牌高度约为人物高度的2/3
+            scale_ratio = target_height / sprite.get_height()
+            cls._left_sprite = pygame.transform.smoothscale(
+                sprite, (int(sprite.get_width() * scale_ratio), target_height)
+            )
         if not is_left and cls._right_sprite is None:
-            cls._right_sprite = pygame.image.load("right_shield.png").convert_alpha()
+            sprite = pygame.image.load("right_shield.png").convert_alpha()
+            target_height = int(320 * 2 / 3)
+            scale_ratio = target_height / sprite.get_height()
+            cls._right_sprite = pygame.transform.smoothscale(
+                sprite, (int(sprite.get_width() * scale_ratio), target_height)
+            )
         return cls._left_sprite if is_left else cls._right_sprite
 
     def __init__(self, x: float, y: float, is_left: bool = True):
