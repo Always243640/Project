@@ -5,6 +5,14 @@ from typing import Optional
 import cv2
 import pygame
 
+from skills import (
+    FlameAttackEffect,
+    HealEffect,
+    NormalAttackEffect,
+    ShieldEffect,
+    UltimateEffect,
+)
+
 from fonts import build_fonts
 from gestures import detect_gestures
 from state import (
@@ -49,6 +57,43 @@ def run_game():
     game_over = False
     winner: Optional[str] = None
     selection_prompt = "比OK开始游戏！"
+
+    effects = []
+
+    def spawn_effect(skill_id: int, actor_rect: pygame.Rect, target_rect: pygame.Rect, is_left: bool):
+        if skill_id == 1:
+            effects.append(
+                NormalAttackEffect(
+                    actor_rect.centerx,
+                    actor_rect.centery - 40,
+                    target_rect.centerx,
+                    target_rect.centery - 40,
+                    is_player1=is_left,
+                )
+            )
+        elif skill_id == 2:
+            effects.append(HealEffect(actor_rect.centerx, actor_rect.centery - 30))
+        elif skill_id == 3:
+            effects.append(
+                FlameAttackEffect(
+                    actor_rect.centerx,
+                    actor_rect.centery - 50,
+                    target_rect.centerx,
+                    target_rect.centery - 50,
+                )
+            )
+        elif skill_id == 4:
+            effects.append(ShieldEffect(actor_rect.centerx, actor_rect.centery, is_left))
+        elif skill_id == 5:
+            effects.append(
+                UltimateEffect(
+                    actor_rect.centerx,
+                    actor_rect.centery - 40,
+                    is_player1=is_left,
+                    target_x=target_rect.centerx,
+                    target_y=target_rect.centery - 40,
+                )
+            )
 
     while True:
         for event in pygame.event.get():
@@ -117,6 +162,7 @@ def run_game():
 
             if not round_state.left_resolved:
                 execute_skill(round_state.left_choice, player_left, player_right)
+                spawn_effect(round_state.left_choice, left_rect, right_rect, True)
                 apply_round_damage(player_right, decrement_cooldown=False)
                 round_state.left_resolved = True
                 round_state.phase_time = time.time()
@@ -135,6 +181,7 @@ def run_game():
 
             if not round_state.right_resolved:
                 execute_skill(round_state.right_choice, player_right, player_left)
+                spawn_effect(round_state.right_choice, right_rect, left_rect, False)
                 apply_round_damage(player_left, decrement_cooldown=False)
                 round_state.right_resolved = True
                 round_state.phase_time = time.time()
@@ -163,6 +210,12 @@ def run_game():
             draw_center_text(screen, fonts, f"Round {round_state.round_index}", HEIGHT // 2 - 40)
             if time.time() - round_state.phase_time >= 1:
                 round_state.reset_for_selection()
+
+        for eff in effects[:]:
+            eff.update()
+            eff.draw(screen)
+            if eff.is_done():
+                effects.remove(eff)
 
         draw_bars(screen, fonts, player_left, (40, HEIGHT - 220))
         draw_bars(screen, fonts, player_right, (WIDTH - 320, HEIGHT - 220))
