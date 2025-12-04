@@ -106,44 +106,59 @@ def run_game():
                     winner = player_left.name
                     game_over = True
                 else:
-                    round_state.phase = "execute"
-                    round_state.execute_time = time.time()
-        elif round_state.phase == "execute":
+                    round_state.phase = "execute_left"
+                    round_state.phase_time = time.time()
+                    round_state.left_resolved = False
+                    round_state.right_resolved = False
+        elif round_state.phase == "execute_left":
             draw_skills_area(screen, fonts, True, round_state.left_choice)
-            draw_skills_area(screen, fonts, False, round_state.right_choice)
-            draw_skill_labels(screen, fonts, round_state.left_choice, round_state.right_choice, left_rect, right_rect)
+            draw_skills_area(screen, fonts, False, None)
+            draw_skill_labels(screen, fonts, round_state.left_choice, None, left_rect, right_rect)
 
-            if time.time() - round_state.execute_time >= 1:
+            if not round_state.left_resolved:
                 execute_skill(round_state.left_choice, player_left, player_right)
+                apply_round_damage(player_right, decrement_cooldown=False)
+                round_state.left_resolved = True
+                round_state.phase_time = time.time()
+
+                if player_right.hp <= 0:
+                    winner = player_left.name
+                    game_over = True
+
+            if not game_over and time.time() - round_state.phase_time >= 2:
+                round_state.phase = "execute_right"
+                round_state.phase_time = time.time()
+        elif round_state.phase == "execute_right":
+            draw_skills_area(screen, fonts, True, None)
+            draw_skills_area(screen, fonts, False, round_state.right_choice)
+            draw_skill_labels(screen, fonts, None, round_state.right_choice, left_rect, right_rect)
+
+            if not round_state.right_resolved:
                 execute_skill(round_state.right_choice, player_right, player_left)
-                apply_round_damage(player_left)
-                apply_round_damage(player_right)
+                apply_round_damage(player_left, decrement_cooldown=False)
+                round_state.right_resolved = True
+                round_state.phase_time = time.time()
 
                 if player_left.hp <= 0:
                     winner = player_right.name
                     game_over = True
-                elif player_right.hp <= 0:
-                    winner = player_left.name
+
+            if not game_over and time.time() - round_state.phase_time >= 2:
+                apply_round_damage(player_left)
+                apply_round_damage(player_right)
+                round_state.round_index += 1
+
+                if round_state.round_index > ROUND_LIMIT:
+                    if player_left.hp > player_right.hp:
+                        winner = player_left.name
+                    elif player_right.hp > player_left.hp:
+                        winner = player_right.name
+                    else:
+                        winner = "平局"
                     game_over = True
                 else:
-                    round_state.round_index += 1
-                    if round_state.round_index > ROUND_LIMIT:
-                        if player_left.hp > player_right.hp:
-                            winner = player_left.name
-                        elif player_right.hp > player_left.hp:
-                            winner = player_right.name
-                        else:
-                            winner = "平局"
-                        game_over = True
-                    else:
-                        round_state.phase = "post_wait"
-                        round_state.phase_time = time.time()
-        elif round_state.phase == "post_wait":
-            draw_skill_labels(screen, fonts, round_state.left_choice, round_state.right_choice, left_rect, right_rect)
-            draw_center_text(screen, fonts, "效果结算完毕", 20)
-            if time.time() - round_state.phase_time >= 2:
-                round_state.phase = "announce"
-                round_state.phase_time = time.time()
+                    round_state.phase = "announce"
+                    round_state.phase_time = time.time()
         elif round_state.phase == "announce":
             draw_center_text(screen, fonts, f"Round {round_state.round_index}", HEIGHT // 2 - 40)
             if time.time() - round_state.phase_time >= 1:

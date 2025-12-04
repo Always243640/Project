@@ -5,23 +5,23 @@ import numpy as np
 import pygame
 
 from fonts import FontLibrary
-from state import PlayerState, skill_name
+from state import HP_MAX, MP_MAX, RAGE_MAX, PlayerState, skill_name
 
 
 def draw_bars(screen, fonts: FontLibrary, player: PlayerState, pos: Tuple[int, int]):
     x, y = pos
     font_small = fonts.small()
     pygame.draw.rect(screen, (60, 60, 60), (x, y, 260, 20))
-    pygame.draw.rect(screen, (200, 60, 60), (x, y, int(260 * player.hp / 100), 20))
-    screen.blit(font_small.render(f"HP: {player.hp}/100", True, (255, 255, 255)), (x + 5, y))
+    pygame.draw.rect(screen, (200, 60, 60), (x, y, int(260 * player.hp / HP_MAX), 20))
+    screen.blit(font_small.render(f"HP: {player.hp}/{HP_MAX}", True, (255, 255, 255)), (x + 5, y))
 
     pygame.draw.rect(screen, (60, 60, 60), (x, y + 25, 260, 18))
-    pygame.draw.rect(screen, (60, 120, 220), (x, y + 25, int(260 * player.mp / 100), 18))
-    screen.blit(font_small.render(f"MP: {player.mp}/100", True, (255, 255, 255)), (x + 5, y + 23))
+    pygame.draw.rect(screen, (60, 120, 220), (x, y + 25, int(260 * player.mp / MP_MAX), 18))
+    screen.blit(font_small.render(f"MP: {player.mp}/{MP_MAX}", True, (255, 255, 255)), (x + 5, y + 23))
 
     pygame.draw.rect(screen, (60, 60, 60), (x, y + 48, 260, 16))
-    pygame.draw.rect(screen, (220, 160, 60), (x, y + 48, int(260 * player.rage / 100), 16))
-    screen.blit(font_small.render(f"Rage: {player.rage}/100", True, (255, 255, 255)), (x + 5, y + 45))
+    pygame.draw.rect(screen, (220, 160, 60), (x, y + 48, int(260 * player.rage / RAGE_MAX), 16))
+    screen.blit(font_small.render(f"Rage: {player.rage}/{RAGE_MAX}", True, (255, 255, 255)), (x + 5, y + 45))
 
     if player.shield > 0:
         shield_text = font_small.render(f"护盾:{player.shield}", True, (100, 220, 255))
@@ -68,10 +68,12 @@ def render_hand_views(screen, fonts: FontLibrary, crops: Dict[str, np.ndarray]):
 
 def draw_skill_labels(screen, fonts: FontLibrary, left_skill: Optional[int], right_skill: Optional[int], left_rect, right_rect):
     font_medium = fonts.medium()
-    left_skill_text = font_medium.render(skill_name(left_skill), True, (0, 255, 180))
-    right_skill_text = font_medium.render(skill_name(right_skill), True, (0, 255, 180))
-    screen.blit(left_skill_text, (left_rect.centerx - 40, left_rect.top - 30))
-    screen.blit(right_skill_text, (right_rect.centerx - 40, right_rect.top - 30))
+    if left_skill is not None:
+        left_skill_text = font_medium.render(skill_name(left_skill), True, (0, 255, 180))
+        screen.blit(left_skill_text, (left_rect.centerx - 40, left_rect.top - 30))
+    if right_skill is not None:
+        right_skill_text = font_medium.render(skill_name(right_skill), True, (0, 255, 180))
+        screen.blit(right_skill_text, (right_rect.centerx - 40, right_rect.top - 30))
 
 
 def draw_center_text(screen, fonts: FontLibrary, text: str, y: int, color=(255, 255, 255)):
