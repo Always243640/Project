@@ -1,4 +1,5 @@
 import math
+import os
 import random
 from typing import List, Tuple
 
@@ -6,6 +7,8 @@ import pygame
 
 # 初始化Pygame混合模式
 pygame.init()
+
+ASSET_DIR = os.path.dirname(__file__)
 
 
 class Particle:
@@ -201,10 +204,16 @@ class FlameAttackEffect:
     def _load_sprite(cls, is_left: bool) -> pygame.Surface:
         if is_left:
             if cls._left_sprite is None:
-                cls._left_sprite = pygame.image.load("left_fire.png").convert_alpha()
+                sprite = pygame.image.load(os.path.join(ASSET_DIR, "left_fire.png")).convert_alpha()
+                cls._left_sprite = pygame.transform.smoothscale(
+                    sprite, (int(sprite.get_width() * 0.6), int(sprite.get_height() * 0.6))
+                )
             return cls._left_sprite
         if cls._right_sprite is None:
-            cls._right_sprite = pygame.image.load("right_fire.png").convert_alpha()
+            sprite = pygame.image.load(os.path.join(ASSET_DIR, "right_fire.png")).convert_alpha()
+            cls._right_sprite = pygame.transform.smoothscale(
+                sprite, (int(sprite.get_width() * 0.6), int(sprite.get_height() * 0.6))
+            )
         return cls._right_sprite
 
     def __init__(self, start_x: float, start_y: float, target_x: float, target_y: float):
@@ -212,7 +221,7 @@ class FlameAttackEffect:
         self.target_pos = (target_x, target_y)
         self.is_left = start_x <= target_x
         self.sprite = self._load_sprite(self.is_left)
-        blur_scale = 1.15
+        blur_scale = 1.08
         blurred = pygame.transform.smoothscale(
             self.sprite,
             (int(self.sprite.get_width() * blur_scale), int(self.sprite.get_height() * blur_scale)),
@@ -223,27 +232,21 @@ class FlameAttackEffect:
         self.speed = 0.06
         self.hit = False
         self.timer = 0
-        self.trail: List[Particle] = []
+        self.elapsed = 0
         self.smoke: List[Particle] = []
         self.burst_particles: List[Particle] = []
         self.max_travel_frames = int(1 / self.speed)
         self.dissipate_frames = 45
         self.fade_portion = 0.18
+        self.wave_phase = random.uniform(0, math.pi * 2)
 
     def update(self):
         if not self.hit:
+            self.elapsed += 1
             self.progress += self.speed
             self.progress = min(1, self.progress)
             cx = self.start_pos[0] + (self.target_pos[0] - self.start_pos[0]) * self.progress
             cy = self.start_pos[1] + (self.target_pos[1] - self.start_pos[1]) * self.progress
-            if random.random() < 0.9:
-                p = Particle(cx, cy, random.choice([(255, 70, 70), (255, 120, 90), (240, 40, 40)]))
-                p.size = random.uniform(4, 8)
-                p.gravity = 0.012
-                self.trail.append(p)
-            for p in self.trail[:]:
-                if not p.update():
-                    self.trail.remove(p)
             if self.progress >= 1:
                 self.hit = True
                 self.timer = self.dissipate_frames
@@ -282,13 +285,14 @@ class FlameAttackEffect:
         if not self.hit:
             cx = self.start_pos[0] + (self.target_pos[0] - self.start_pos[0]) * self.progress
             cy = self.start_pos[1] + (self.target_pos[1] - self.start_pos[1]) * self.progress
-            for p in self.trail:
-                p.draw(surface)
 
             angle = -math.degrees(math.atan2(self.target_pos[1] - self.start_pos[1], self.target_pos[0] - self.start_pos[0]))
             fade_in = min(1.0, self.progress / self.fade_portion)
             fade_out = min(1.0, (1 - self.progress) / self.fade_portion)
             alpha_factor = min(fade_in, fade_out)
+
+            wobble = math.sin((self.elapsed + self.wave_phase) * 0.4) * 6 + random.uniform(-1.5, 1.5)
+            cy += wobble
 
             sprite = pygame.transform.rotozoom(self.sprite, angle, 1.0)
             blur = pygame.transform.rotozoom(self.blurred_sprite, angle, 1.0)
@@ -393,7 +397,7 @@ class UltimateEffect:
     @classmethod
     def _load_boom(cls) -> pygame.Surface:
         if cls._boom_sprite is None:
-            sprite = pygame.image.load("boom.gif").convert_alpha()
+            sprite = pygame.image.load(os.path.join(ASSET_DIR, "boom.gif")).convert_alpha()
             sprite.set_colorkey((0, 0, 0))
             cls._boom_sprite = sprite
         return cls._boom_sprite
