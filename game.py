@@ -34,8 +34,8 @@ def run_game():
     right_player_img = pygame.transform.scale(pygame.image.load("right.png"), (PLAYER_WIDTH, PLAYER_HEIGHT))
     left_rect = left_player_img.get_rect()
     right_rect = right_player_img.get_rect()
-    left_rect.midbottom = (WIDTH // 4, HEIGHT - 40)
-    right_rect.midbottom = (WIDTH * 3 // 4, HEIGHT - 40)
+    left_rect.midbottom = (WIDTH // 4, HEIGHT - 120)
+    right_rect.midbottom = (WIDTH * 3 // 4-100, HEIGHT - 120)
 
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():

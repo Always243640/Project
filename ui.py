@@ -62,7 +62,7 @@ def render_hand_views(screen, fonts: FontLibrary, crops: Dict[str, np.ndarray]):
             screen.blit(surface, pos)
         else:
             pygame.draw.rect(screen, (40, 40, 40), (*pos, 260, 180))
-            hint = "请伸左手" if label == "Left" else "请伸右手"
+            hint = "Player 1" if label == "Left" else "Player 2"
             screen.blit(font_small.render(hint, True, (200, 200, 200)), (pos[0] + 60, pos[1] + 80))
 
 
