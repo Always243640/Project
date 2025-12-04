@@ -219,7 +219,7 @@ class FlameAttackEffect:
     def __init__(self, start_x: float, start_y: float, target_x: float, target_y: float):
         self.start_pos = (start_x, start_y)
         self.target_pos = (target_x, target_y)
-        self.is_left = start_x <= target_x
+        self.is_left = start_x < target_x
         self.sprite = self._load_sprite(self.is_left)
         blur_scale = 1.08
         blurred = pygame.transform.smoothscale(
@@ -408,7 +408,7 @@ class UltimateEffect:
         self.is_player1 = is_player1
         self.charge_frames = 18
         self.flight_frames = 14
-        self.explosion_frames = 55
+        self.explosion_frames = 78
         self.stage = 0  # 0:charge,1:flight,2:explode
         self.timer = 0
         self.projectile_pos = list(self.start_pos)
@@ -477,23 +477,27 @@ class UltimateEffect:
             pygame.draw.circle(glow, (*self.main_color, 200), (15, 15), 7)
             surface.blit(glow, (int(self.projectile_pos[0] - 15), int(self.projectile_pos[1] - 15)))
         elif self.stage == 2:
-            progress = min(1, self.timer / self.explosion_frames)
-            radius = 30 + progress * 50
-            alpha = int(255 * (1 - progress))
+            progress = min(1.0, self.timer / self.explosion_frames)
+            eased = progress ** 0.7
+            radius = 36 + eased * 64
+            alpha = int(255 * (1 - eased))
             ring = pygame.Surface((int(radius * 2), int(radius * 2)), pygame.SRCALPHA)
-            pygame.draw.circle(ring, (*self.main_color, alpha), (int(radius), int(radius)), int(radius), 6)
+            highlight_color = tuple(min(255, c + 60) for c in self.main_color)
+            pygame.draw.circle(ring, (*highlight_color, min(255, alpha + 40)), (int(radius), int(radius)), int(radius), 8)
+            pygame.draw.circle(ring, (*self.main_color, alpha), (int(radius), int(radius)), int(radius * 0.62))
             surface.blit(ring, (int(self.target_pos[0] - radius), int(self.target_pos[1] - radius)))
             # 爆炸贴图加戏：扩大并逐渐淡出
-            boom_size = 90 + progress * 90
+            target_visual_size = max(320, self.boom_sprite.get_width(), self.boom_sprite.get_height())
+            boom_size = target_visual_size * 3
             boom = pygame.transform.smoothscale(self.boom_sprite, (int(boom_size), int(boom_size)))
-            boom.set_alpha(max(0, int(240 * (1 - progress))))
+            boom.set_alpha(max(0, int(255 * (1 - eased))))
             boom_rect = boom.get_rect(center=(int(self.target_pos[0]), int(self.target_pos[1] - 10)))
             surface.blit(boom, boom_rect)
             for p in self.explosion_particles:
                 p.draw(surface)
             if progress < 0.6:
                 font = pygame.font.Font(None, 36)
-                text = font.render("-90", True, self.main_color)
+                text = font.render("-90", True, highlight_color)
                 surface.blit(text, (self.target_pos[0] - 20, self.target_pos[1] - 60))
 
     def is_done(self) -> bool:
