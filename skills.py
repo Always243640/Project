@@ -48,9 +48,9 @@ class NormalAttackEffect:
     def _load_claw(cls) -> pygame.Surface:
         if cls._claw_sprite is None:
             sprite = pygame.image.load("claw.png").convert_alpha()
-            # 抓痕缩小为原先的一半，避免遮挡角色
+            # 抓痕缩小为原先的35%，避免遮挡角色
             cls._claw_sprite = pygame.transform.smoothscale(
-                sprite, (int(sprite.get_width() * 0.5), int(sprite.get_height() * 0.5))
+                sprite, (int(sprite.get_width() * 0.35), int(sprite.get_height() * 0.35))
             )
         return cls._claw_sprite
 
@@ -60,13 +60,12 @@ class NormalAttackEffect:
         self.current_pos = list(self.start_pos)
         self.color = (240, 200, 120) if is_player1 else (120, 210, 240)
         self.timer = 0
-        self.travel_frames = 12  # 略快一些的起手
         self.slash_frames = 30   # 击中后的显示时间与淡出
-        self.trail: List[dict] = []
         self.claw_marks: List[dict] = []
-        self.hit = False
+        self.hit = True
         self.damage_timer = 0
         self.claw_sprite = self._load_claw()
+        self._create_claw()
 
     def _create_claw(self):
         base_angle = math.atan2(self.target_pos[1] - self.start_pos[1], self.target_pos[0] - self.start_pos[0])
@@ -109,64 +108,31 @@ class NormalAttackEffect:
 
     def update(self):
         self.timer += 1
-        if not self.hit:
-            progress = min(1, self.timer / self.travel_frames)
-            self.current_pos[0] = self.start_pos[0] + (self.target_pos[0] - self.start_pos[0]) * progress
-            self.current_pos[1] = self.start_pos[1] + (self.target_pos[1] - self.start_pos[1]) * progress
-            self.trail.append({
-                "x": self.current_pos[0],
-                "y": self.current_pos[1],
-                "alpha": 200,
-                "life": 12
-            })
-            if progress >= 1:
-                self.hit = True
-                self._create_claw()
-        else:
-            for mark in self.claw_marks[:]:
-                mark["life"] -= 1
-                mark["alpha"] = int(255 * (mark["life"] / self.slash_frames))
-                if mark["life"] <= 0:
-                    self.claw_marks.remove(mark)
-            if self.damage_timer > 0:
-                self.damage_timer -= 1
-
-        for trail in self.trail[:]:
-            trail["life"] -= 1
-            trail["alpha"] = max(0, trail["alpha"] - 16)
-            if trail["life"] <= 0:
-                self.trail.remove(trail)
+        for mark in self.claw_marks[:]:
+            mark["life"] -= 1
+            mark["alpha"] = int(255 * (mark["life"] / self.slash_frames))
+            if mark["life"] <= 0:
+                self.claw_marks.remove(mark)
+        if self.damage_timer > 0:
+            self.damage_timer -= 1
 
     def draw(self, surface: pygame.Surface):
-        # 轨迹模糊
-        for trail in self.trail:
-            radius = 10
-            blur_surface = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-            pygame.draw.circle(blur_surface, (*self.color, trail["alpha"]), (radius, radius), radius)
-            surface.blit(blur_surface, (int(trail["x"] - radius), int(trail["y"] - radius)))
+        for mark in self.claw_marks:
+            mark["blur"].set_alpha(int(mark["alpha"] * 0.6))
+            mark["sharp"].set_alpha(mark["alpha"])
+            surface.blit(mark["blur"], mark["blur_rect"])
+            surface.blit(mark["sharp"], mark["rect"])
 
-        if not self.hit:
-            core = pygame.Surface((18, 18), pygame.SRCALPHA)
-            pygame.draw.circle(core, (255, 255, 255, 230), (9, 9), 9)
-            pygame.draw.circle(core, (*self.color, 200), (9, 9), 6)
-            surface.blit(core, (int(self.current_pos[0] - 9), int(self.current_pos[1] - 9)))
-        else:
-            for mark in self.claw_marks:
-                mark["blur"].set_alpha(int(mark["alpha"] * 0.6))
-                mark["sharp"].set_alpha(mark["alpha"])
-                surface.blit(mark["blur"], mark["blur_rect"])
-                surface.blit(mark["sharp"], mark["rect"])
-
-            if self.damage_timer > 0:
-                font = pygame.font.Font(None, 32)
-                alpha = int(255 * (self.damage_timer / self.slash_frames))
-                text = font.render("-10", True, (255, 80, 80))
-                text.set_alpha(alpha)
-                y_offset = (self.slash_frames - self.damage_timer) * 0.6
-                surface.blit(text, (self.target_pos[0] - 16, self.target_pos[1] - 40 - y_offset))
+        if self.damage_timer > 0:
+            font = pygame.font.Font(None, 32)
+            alpha = int(255 * (self.damage_timer / self.slash_frames))
+            text = font.render("-10", True, (255, 80, 80))
+            text.set_alpha(alpha)
+            y_offset = (self.slash_frames - self.damage_timer) * 0.6
+            surface.blit(text, (self.target_pos[0] - 16, self.target_pos[1] - 40 - y_offset))
 
     def is_done(self) -> bool:
-        return self.hit and not self.trail and not self.claw_marks and self.damage_timer <= 0
+        return self.hit and not self.claw_marks and self.damage_timer <= 0
 
 
 class HealEffect:
@@ -228,9 +194,31 @@ class HealEffect:
 class FlameAttackEffect:
     """火焰攻击：火焰弹飞向目标，命中后逐渐消散"""
 
+    _left_sprite: pygame.Surface | None = None
+    _right_sprite: pygame.Surface | None = None
+
+    @classmethod
+    def _load_sprite(cls, is_left: bool) -> pygame.Surface:
+        if is_left:
+            if cls._left_sprite is None:
+                cls._left_sprite = pygame.image.load("left_fire.png").convert_alpha()
+            return cls._left_sprite
+        if cls._right_sprite is None:
+            cls._right_sprite = pygame.image.load("right_fire.png").convert_alpha()
+        return cls._right_sprite
+
     def __init__(self, start_x: float, start_y: float, target_x: float, target_y: float):
         self.start_pos = (start_x, start_y)
         self.target_pos = (target_x, target_y)
+        self.is_left = start_x <= target_x
+        self.sprite = self._load_sprite(self.is_left)
+        blur_scale = 1.15
+        blurred = pygame.transform.smoothscale(
+            self.sprite,
+            (int(self.sprite.get_width() * blur_scale), int(self.sprite.get_height() * blur_scale)),
+        )
+        blurred.set_alpha(180)
+        self.blurred_sprite = blurred
         self.progress = 0
         self.speed = 0.06
         self.hit = False
@@ -240,6 +228,7 @@ class FlameAttackEffect:
         self.burst_particles: List[Particle] = []
         self.max_travel_frames = int(1 / self.speed)
         self.dissipate_frames = 45
+        self.fade_portion = 0.18
 
     def update(self):
         if not self.hit:
@@ -296,15 +285,21 @@ class FlameAttackEffect:
             for p in self.trail:
                 p.draw(surface)
 
-            # 火球主体：前端尖形，带有强烈亮度
-            flame = pygame.Surface((70, 44), pygame.SRCALPHA)
-            pygame.draw.ellipse(flame, (255, 150, 150, 230), (6, 8, 56, 28))
-            pygame.draw.ellipse(flame, (240, 50, 50, 255), (14, 12, 40, 18))
-            pygame.draw.circle(flame, (255, 240, 240, 240), (52, 22), 10)
             angle = -math.degrees(math.atan2(self.target_pos[1] - self.start_pos[1], self.target_pos[0] - self.start_pos[0]))
-            rotated = pygame.transform.rotate(flame, angle)
-            rect = rotated.get_rect(center=(int(cx), int(cy)))
-            surface.blit(rotated, rect)
+            fade_in = min(1.0, self.progress / self.fade_portion)
+            fade_out = min(1.0, (1 - self.progress) / self.fade_portion)
+            alpha_factor = min(fade_in, fade_out)
+
+            sprite = pygame.transform.rotozoom(self.sprite, angle, 1.0)
+            blur = pygame.transform.rotozoom(self.blurred_sprite, angle, 1.0)
+            sprite.set_alpha(int(255 * alpha_factor))
+            blur.set_alpha(int(170 * alpha_factor))
+
+            rect_blur = blur.get_rect(center=(int(cx), int(cy)))
+            rect = sprite.get_rect(center=(int(cx), int(cy)))
+
+            surface.blit(blur, rect_blur)
+            surface.blit(sprite, rect)
         else:
             for p in self.smoke:
                 p.draw(surface)

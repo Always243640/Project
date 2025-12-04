@@ -17,7 +17,7 @@ class PlayerState:
     is_left: bool
     hp: int = HP_MAX
     mp: int = MP_MAX
-    rage: int = 0
+    rage: int = 20
     shield: int = 0
     shield_turns: int = 0
     debuff_attack: int = 0
