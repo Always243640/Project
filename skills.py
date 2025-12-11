@@ -241,14 +241,25 @@ class FlameAttackEffect:
         self.dissipate_frames = 45
         self.fade_portion = 0.18
         self.wave_phase = random.uniform(0, math.pi * 2)
-        self.vertical_jitter = 0.0
+        self.distort_phase = random.uniform(0, math.pi * 2)
+
+    def _apply_vertical_wave(self, source: pygame.Surface, phase: float, amplitude: int = 4, frequency: float = 0.22) -> pygame.Surface:
+        """对火焰图片按列施加正弦扰动，使局部产生上下波动。"""
+        width, height = source.get_size()
+        offset_margin = amplitude * 2
+        result = pygame.Surface((width, height + offset_margin), pygame.SRCALPHA)
+        for x in range(width):
+            offset = int(math.sin(phase + x * frequency) * amplitude)
+            column = source.subsurface((x, 0, 1, height))
+            result.blit(column, (x, amplitude + offset))
+        return result
 
     def update(self):
         if not self.hit:
             self.elapsed += 1
             self.progress += self.speed
             self.progress = min(1, self.progress)
-            self.vertical_jitter = random.uniform(-3.0, 3.0)
+            self.distort_phase += 0.3
             cx = self.start_pos[0] + (self.target_pos[0] - self.start_pos[0]) * self.progress
             cy = self.start_pos[1] + (self.target_pos[1] - self.start_pos[1]) * self.progress
             if self.progress >= 1:
@@ -296,10 +307,13 @@ class FlameAttackEffect:
             alpha_factor = min(fade_in, fade_out)
 
             wobble = math.sin((self.elapsed + self.wave_phase) * 0.4) * 6 + random.uniform(-1.5, 1.5)
-            cy += wobble + self.vertical_jitter
+            cy += wobble
 
-            sprite = pygame.transform.rotozoom(self.sprite, angle, 1.0)
-            blur = pygame.transform.rotozoom(self.blurred_sprite, angle, 1.0)
+            distorted_sprite = self._apply_vertical_wave(self.sprite, self.distort_phase)
+            distorted_blur = self._apply_vertical_wave(self.blurred_sprite, self.distort_phase, amplitude=5)
+
+            sprite = pygame.transform.rotozoom(distorted_sprite, angle, 1.0)
+            blur = pygame.transform.rotozoom(distorted_blur, angle, 1.0)
             sprite.set_alpha(int(255 * alpha_factor))
             blur.set_alpha(int(170 * alpha_factor))
 
