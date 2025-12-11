@@ -8,13 +8,10 @@ import io
 
 # 初始化Pygame混合模式
 pygame.init()
-
 ASSET_DIR = os.path.dirname(__file__)
-
 
 class Particle:
     """轻量级粒子基类，用于各种技能残影与烟雾"""
-
     def __init__(self, x: float, y: float, color: Tuple[int, int, int]):
         self.x = x
         self.y = y
@@ -42,17 +39,14 @@ class Particle:
         pygame.draw.circle(temp, (*self.color, alpha), (size, size), size)
         surface.blit(temp, (int(self.x - size), int(self.y - size)))
 
-
 class NormalAttackEffect:
     """普攻：爪痕挥砍并显示伤害数字"""
-
     _claw_sprite: pygame.Surface | None = None
-
     @classmethod
     def _load_claw(cls) -> pygame.Surface:
         if cls._claw_sprite is None:
             sprite = pygame.image.load("claw.png").convert_alpha()
-            # 抓痕缩小为原先的35%，避免遮挡角色
+            # 抓痕缩小为原先的35%
             cls._claw_sprite = pygame.transform.smoothscale(
                 sprite, (int(sprite.get_width() * 0.35), int(sprite.get_height() * 0.35))
             )
@@ -76,7 +70,6 @@ class NormalAttackEffect:
         for i in range(3):
             scale = 0.95 + i * 0.08
             sprite = pygame.transform.rotozoom(self.claw_sprite, 0, scale)
-            # 以平行于攻击方向的角度旋转
             angle = base_angle + random.uniform(-0.18, 0.18)
             blur_scale = 1.25
             blurred = pygame.transform.smoothscale(
@@ -141,12 +134,11 @@ class NormalAttackEffect:
 
 class HealEffect:
     """加血：冒泡式加号与绿色数字"""
-
     def __init__(self, x: float, y: float):
         self.x = x
         self.y = y
         self.timer = 0
-        self.duration = 70  # 约1.1秒
+        self.duration = 70
         self.pluses: List[dict] = []
         self.glow_radius = 0
 
@@ -197,7 +189,6 @@ class HealEffect:
 
 class FlameAttackEffect:
     """火焰攻击：火焰弹飞向目标，命中后逐渐消散（使用Pillow增强模糊效果）"""
-
     _left_sprite: pygame.Surface | None = None
     _right_sprite: pygame.Surface | None = None
     _left_blurred_cache: pygame.Surface | None = None
@@ -235,10 +226,8 @@ class FlameAttackEffect:
         size = surface.get_size()
         data = pygame.image.tostring(surface, 'RGBA')
         pil_image = Image.frombytes('RGBA', size, data)
-
         # 基础高斯模糊
         gaussian_blur = pil_image.filter(ImageFilter.GaussianBlur(radius=3))
-
         # 转换为pygame Surface
         return pygame.image.fromstring(gaussian_blur.tobytes(), size, 'RGBA')
 
@@ -247,7 +236,6 @@ class FlameAttackEffect:
         self.target_pos = (target_x, target_y)
         self.is_left = start_x < target_x
         self.sprite = self._load_sprite(self.is_left)
-
         # 使用缓存的模糊精灵
         if self.is_left:
             self.blurred_sprite = FlameAttackEffect._left_blurred_cache
@@ -265,7 +253,6 @@ class FlameAttackEffect:
         self.dissipate_frames = 45
         self.fade_portion = 0.18
         self.wave_phase = random.uniform(0, math.pi * 2)
-
         # 轨迹效果
         self.trail_positions = []
         self.trail_max_length = 5
@@ -276,16 +263,13 @@ class FlameAttackEffect:
             self.elapsed += 1
             self.progress += self.speed
             self.progress = min(1, self.progress)
-
             # 计算当前位置
             cx = self.start_pos[0] + (self.target_pos[0] - self.start_pos[0]) * self.progress
             cy = self.start_pos[1] + (self.target_pos[1] - self.start_pos[1]) * self.progress
-
             # 添加轨迹点
             self.trail_positions.insert(0, (cx, cy))
             if len(self.trail_positions) > self.trail_max_length:
                 self.trail_positions.pop()
-
             if self.progress >= 1:
                 self.hit = True
                 self.timer = self.dissipate_frames
@@ -301,7 +285,7 @@ class FlameAttackEffect:
 
     def _create_impact_effects(self):
         """创建冲击效果"""
-        # 烟雾粒子（使用RGB三元组）
+        # 烟雾粒子
         for _ in range(32):
             smoke = Particle(
                 self.target_pos[0], self.target_pos[1],
@@ -314,8 +298,7 @@ class FlameAttackEffect:
             smoke.life = random.randint(30, 50)
             smoke.max_life = smoke.life
             self.smoke.append(smoke)
-
-        # 余烬粒子（使用RGB三元组）
+        # 余烬粒子
         for _ in range(22):
             ember = Particle(
                 self.target_pos[0], self.target_pos[1],
@@ -328,39 +311,31 @@ class FlameAttackEffect:
             ember.life = random.randint(20, 35)
             ember.max_life = ember.life
             self.burst_particles.append(ember)
-
     def draw(self, surface: pygame.Surface):
         if not self.hit:
             cx = self.start_pos[0] + (self.target_pos[0] - self.start_pos[0]) * self.progress
             cy = self.start_pos[1] + (self.target_pos[1] - self.start_pos[1]) * self.progress
-
             # 添加摆动效果
             wobble = math.sin((self.elapsed + self.wave_phase) * 0.4) * 6 + random.uniform(-1.5, 1.5)
             cy += wobble
-
             # 计算角度和透明度
             angle = -math.degrees(math.atan2(
                 self.target_pos[1] - self.start_pos[1],
                 self.target_pos[0] - self.start_pos[0]
             ))
-
             fade_in = min(1.0, self.progress / self.fade_portion)
             fade_out = min(1.0, (1 - self.progress) / self.fade_portion)
             alpha_factor = min(fade_in, fade_out)
-
             # 旋转精灵
             sprite = pygame.transform.rotozoom(self.sprite, angle, 1.0)
             blur = pygame.transform.rotozoom(self.blurred_sprite, angle, 1.0)
-
             # 设置透明度
             base_alpha = int(255 * alpha_factor)
             sprite.set_alpha(base_alpha)
             blur.set_alpha(int(200 * alpha_factor * 0.7))
-
             # 获取矩形
             rect_blur = blur.get_rect(center=(int(cx), int(cy)))
             rect_sprite = sprite.get_rect(center=(int(cx), int(cy)))
-
             # 绘制轨迹
             for i, (trail_x, trail_y) in enumerate(self.trail_positions[1:], 1):
                 if i < len(self.trail_alphas):
@@ -371,7 +346,6 @@ class FlameAttackEffect:
                     trail_sprite.set_alpha(trail_alpha)
                     trail_rect = trail_sprite.get_rect(center=(int(trail_x), int(trail_y)))
                     surface.blit(trail_sprite, trail_rect)
-
             # 绘制效果
             surface.blit(blur, rect_blur)
             surface.blit(sprite, rect_sprite)
@@ -381,17 +355,14 @@ class FlameAttackEffect:
                 p.draw(surface)
             for p in self.burst_particles:
                 p.draw(surface)
-
             # 绘制消散光环
             if self.timer > 0:
                 self._draw_dissipating_halo(surface)
-
     def _draw_dissipating_halo(self, surface: pygame.Surface):
         """绘制消散时的光环效果"""
         alpha = int(230 * (self.timer / self.dissipate_frames))
         radius = 48 - (self.timer / self.dissipate_frames) * 26
 
-        # 简化版光环
         temp = pygame.Surface((int(radius * 2), int(radius * 2)), pygame.SRCALPHA)
         pygame.draw.circle(temp, (255, 100, 100, alpha),
                            (int(radius), int(radius)), int(radius), 4)
@@ -405,7 +376,6 @@ class FlameAttackEffect:
         return self.hit and self.timer <= 0 and not self.smoke and not self.burst_particles
 class ShieldEffect:
     """防御屏障：盾牌图片下降到角色侧面，维持一回合后淡出"""
-
     _left_sprite: pygame.Surface | None = None
     _right_sprite: pygame.Surface | None = None
 
@@ -433,7 +403,7 @@ class ShieldEffect:
         self.current_y = self.final_y - 220
         self.state = "drop"  # drop -> hold -> fade
         self.timer = 0
-        self.hold_frames = 70  # 约一回合显示
+        self.hold_frames = 70
         self.fade_frames = 30
         self.sprite = self._load_sprite(is_left)
         self.is_left = is_left
@@ -470,10 +440,8 @@ class ShieldEffect:
     def is_done(self) -> bool:
         return self.state == "fade" and self.timer <= 0
 
-
 class UltimateEffect:
     """大招：蓄力后对敌方位置产生爆炸"""
-
     _boom_frames: List[pygame.Surface] | None = None
 
     @classmethod

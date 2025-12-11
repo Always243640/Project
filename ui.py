@@ -1,12 +1,9 @@
 from typing import Dict, Optional, Tuple
-
 import cv2
 import numpy as np
 import pygame
-
 from fonts import FontLibrary
 from state import HP_MAX, MP_MAX, RAGE_MAX, PlayerState, skill_name
-
 
 def draw_bars(screen, fonts: FontLibrary, player: PlayerState, pos: Tuple[int, int]):
     x, y = pos

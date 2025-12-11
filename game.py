@@ -1,10 +1,8 @@
 import sys
 import time
 from typing import Optional
-
 import cv2
 import pygame
-
 from skills import (
     FlameAttackEffect,
     HealEffect,
@@ -27,7 +25,6 @@ from ui import draw_bars, draw_center_text, draw_skill_labels, draw_skills_area,
 
 WIDTH, HEIGHT = 1280, 720
 PLAYER_WIDTH, PLAYER_HEIGHT = 220, 320
-
 
 def run_game():
     pygame.init()
@@ -221,7 +218,7 @@ def run_game():
         draw_bars(screen, fonts, player_right, (WIDTH - 320, HEIGHT - 220))
 
         pygame.display.flip()
-        clock.tick(30)
+        clock.tick(18)
 
     cap.release()
     pygame.quit()
