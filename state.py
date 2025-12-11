@@ -1,15 +1,11 @@
 import time
 from dataclasses import dataclass, field
 from typing import Optional
-
-
 ROUND_LIMIT = 15
 SELECTION_TIME = 5
-
 HP_MAX = 100
 MP_MAX = 50
 RAGE_MAX = 30
-
 
 @dataclass
 class PlayerState:
@@ -51,7 +47,7 @@ class PlayerState:
 @dataclass
 class RoundState:
     round_index: int = 1
-    phase: str = "select"  # select -> execute_left -> execute_right -> announce
+    phase: str = "select"
     selection_start: float = field(default_factory=time.time)
     left_choice: Optional[int] = None
     right_choice: Optional[int] = None
