@@ -408,6 +408,14 @@ class UltimateEffect:
                     for frame_idx in range(img.n_frames):
                         img.seek(frame_idx)
                         rgba_frame = img.convert("RGBA")
+                        # 将纯黑背景转换为透明，避免叠加时出现黑边
+                        transparent_ready = []
+                        for r, g, b, a in rgba_frame.getdata():
+                            if r < 10 and g < 10 and b < 10:
+                                transparent_ready.append((r, g, b, 0))
+                            else:
+                                transparent_ready.append((r, g, b, a))
+                        rgba_frame.putdata(transparent_ready)
                         surface = pygame.image.fromstring(
                             rgba_frame.tobytes(), rgba_frame.size, "RGBA"
                         ).convert_alpha()
