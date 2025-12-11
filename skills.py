@@ -243,15 +243,16 @@ class FlameAttackEffect:
         self.wave_phase = random.uniform(0, math.pi * 2)
         self.distort_phase = random.uniform(0, math.pi * 2)
 
-    def _apply_vertical_wave(self, source: pygame.Surface, phase: float, amplitude: int = 4, frequency: float = 0.22) -> pygame.Surface:
-        """对火焰图片按列施加正弦扰动，使局部产生上下波动。"""
+    def _apply_vertical_wave(self, source: pygame.Surface, phase: float, amplitude: int = 4, frequency: float = 0.22, jitter: int = 2) -> pygame.Surface:
+        """对火焰图片按列施加正弦扰动，使局部产生上下波动，并在每帧加入随机扰动。"""
         width, height = source.get_size()
-        offset_margin = amplitude * 2
+        offset_margin = (amplitude + jitter) * 2
         result = pygame.Surface((width, height + offset_margin), pygame.SRCALPHA)
         for x in range(width):
             offset = int(math.sin(phase + x * frequency) * amplitude)
+            offset += random.randint(-jitter, jitter)
             column = source.subsurface((x, 0, 1, height))
-            result.blit(column, (x, amplitude + offset))
+            result.blit(column, (x, amplitude + jitter + offset))
         return result
 
     def update(self):
@@ -309,8 +310,8 @@ class FlameAttackEffect:
             wobble = math.sin((self.elapsed + self.wave_phase) * 0.4) * 6 + random.uniform(-1.5, 1.5)
             cy += wobble
 
-            distorted_sprite = self._apply_vertical_wave(self.sprite, self.distort_phase)
-            distorted_blur = self._apply_vertical_wave(self.blurred_sprite, self.distort_phase, amplitude=5)
+            distorted_sprite = self._apply_vertical_wave(self.sprite, self.distort_phase, jitter=3)
+            distorted_blur = self._apply_vertical_wave(self.blurred_sprite, self.distort_phase, amplitude=5, jitter=4)
 
             sprite = pygame.transform.rotozoom(distorted_sprite, angle, 1.0)
             blur = pygame.transform.rotozoom(distorted_blur, angle, 1.0)
@@ -419,6 +420,7 @@ class UltimateEffect:
             frames: List[pygame.Surface] = []
             try:
                 with Image.open(gif_path) as img:
+                    pil_frames: List[Image.Image] = []
                     for frame_idx in range(img.n_frames):
                         img.seek(frame_idx)
                         rgba_frame = img.convert("RGBA")
@@ -430,8 +432,18 @@ class UltimateEffect:
                             else:
                                 transparent_ready.append((r, g, b, a))
                         rgba_frame.putdata(transparent_ready)
+                        pil_frames.append(rgba_frame.copy())
+                    # 增加帧数：为相邻帧插入插值帧，使爆炸更加顺滑
+                    expanded_frames: List[Image.Image] = []
+                    for idx, frame in enumerate(pil_frames):
+                        expanded_frames.append(frame)
+                        if idx < len(pil_frames) - 1:
+                            next_frame = pil_frames[idx + 1]
+                            blended = Image.blend(frame, next_frame, 0.5)
+                            expanded_frames.append(blended)
+                    for frame in expanded_frames:
                         surface = pygame.image.fromstring(
-                            rgba_frame.tobytes(), rgba_frame.size, "RGBA"
+                            frame.tobytes(), frame.size, "RGBA"
                         ).convert_alpha()
                         frames.append(surface)
             except Exception:
