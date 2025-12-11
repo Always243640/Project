@@ -4,6 +4,7 @@ import random
 from typing import List, Tuple
 
 import pygame
+from PIL import Image
 
 # 初始化Pygame混合模式
 pygame.init()
@@ -240,12 +241,14 @@ class FlameAttackEffect:
         self.dissipate_frames = 45
         self.fade_portion = 0.18
         self.wave_phase = random.uniform(0, math.pi * 2)
+        self.vertical_jitter = 0.0
 
     def update(self):
         if not self.hit:
             self.elapsed += 1
             self.progress += self.speed
             self.progress = min(1, self.progress)
+            self.vertical_jitter = random.uniform(-3.0, 3.0)
             cx = self.start_pos[0] + (self.target_pos[0] - self.start_pos[0]) * self.progress
             cy = self.start_pos[1] + (self.target_pos[1] - self.start_pos[1]) * self.progress
             if self.progress >= 1:
@@ -293,7 +296,7 @@ class FlameAttackEffect:
             alpha_factor = min(fade_in, fade_out)
 
             wobble = math.sin((self.elapsed + self.wave_phase) * 0.4) * 6 + random.uniform(-1.5, 1.5)
-            cy += wobble
+            cy += wobble + self.vertical_jitter
 
             sprite = pygame.transform.rotozoom(self.sprite, angle, 1.0)
             blur = pygame.transform.rotozoom(self.blurred_sprite, angle, 1.0)
@@ -393,15 +396,28 @@ class ShieldEffect:
 class UltimateEffect:
     """大招：蓄力后对敌方位置产生爆炸"""
 
-    _boom_sprite: pygame.Surface | None = None
+    _boom_frames: List[pygame.Surface] | None = None
 
     @classmethod
-    def _load_boom(cls) -> pygame.Surface:
-        if cls._boom_sprite is None:
-            sprite = pygame.image.load(os.path.join(ASSET_DIR, "boom.gif")).convert_alpha()
-            sprite.set_colorkey((0, 0, 0))
-            cls._boom_sprite = sprite
-        return cls._boom_sprite
+    def _load_boom_frames(cls) -> List[pygame.Surface]:
+        if cls._boom_frames is None:
+            gif_path = os.path.join(ASSET_DIR, "boom.gif")
+            frames: List[pygame.Surface] = []
+            try:
+                with Image.open(gif_path) as img:
+                    for frame_idx in range(img.n_frames):
+                        img.seek(frame_idx)
+                        rgba_frame = img.convert("RGBA")
+                        surface = pygame.image.fromstring(
+                            rgba_frame.tobytes(), rgba_frame.size, "RGBA"
+                        ).convert_alpha()
+                        frames.append(surface)
+            except Exception:
+                fallback = pygame.image.load(gif_path).convert_alpha()
+                fallback.set_colorkey((0, 0, 0))
+                frames.append(fallback)
+            cls._boom_frames = frames
+        return cls._boom_frames
 
     def __init__(self, x: float, y: float, is_player1: bool = True, target_x: float | None = None, target_y: float | None = None):
         self.start_pos = (x, y)
@@ -416,7 +432,7 @@ class UltimateEffect:
         self.charge_particles: List[Particle] = []
         self.explosion_particles: List[Particle] = []
         self.main_color = (255, 130, 130) if is_player1 else (120, 140, 255)
-        self.boom_sprite = self._load_boom()
+        self.boom_frames = self._load_boom_frames()
 
     def update(self):
         self.timer += 1
@@ -488,12 +504,16 @@ class UltimateEffect:
             pygame.draw.circle(ring, (*self.main_color, alpha), (int(radius), int(radius)), int(radius * 0.62))
             surface.blit(ring, (int(self.target_pos[0] - radius), int(self.target_pos[1] - radius)))
             # 爆炸贴图加戏：扩大并逐渐淡出
-            target_visual_size = max(120, self.boom_sprite.get_width(), self.boom_sprite.get_height())
-            boom_size = target_visual_size
-            boom = pygame.transform.smoothscale(self.boom_sprite, (int(boom_size), int(boom_size)))
-            boom.set_alpha(max(0, int(255 * (1 - eased))))
-            boom_rect = boom.get_rect(center=(int(self.target_pos[0]), int(self.target_pos[1] - 10)))
-            surface.blit(boom, boom_rect)
+            if self.boom_frames:
+                frame_progress = min(1.0, self.timer / self.explosion_frames)
+                frame_index = min(len(self.boom_frames) - 1, int(frame_progress * (len(self.boom_frames) - 1)))
+                boom_frame = self.boom_frames[frame_index]
+                target_visual_size = max(120, boom_frame.get_width(), boom_frame.get_height())
+                boom_size = target_visual_size
+                boom = pygame.transform.smoothscale(boom_frame, (int(boom_size), int(boom_size)))
+                boom.set_alpha(max(0, int(255 * (1 - eased))))
+                boom_rect = boom.get_rect(center=(int(self.target_pos[0]), int(self.target_pos[1] - 10)))
+                surface.blit(boom, boom_rect)
             for p in self.explosion_particles:
                 p.draw(surface)
             if progress < 0.6:
